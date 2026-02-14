@@ -301,27 +301,21 @@ const Engine = (() => {
     };
   }
 
-  function advanceBillStage(bill) {
-    const currentIdx = CONFIG.BILL_STAGES.indexOf(bill.stage);
-    if (currentIdx < 0 || currentIdx >= CONFIG.BILL_STAGES.length - 1) return;
-
-    // Vote at Second Reading and Third Reading
-    if (bill.stage === 'First Reading' || bill.stage === 'Committee Stage' || bill.stage === 'Report Stage' || bill.stage === 'Lords') {
-      bill.stage = CONFIG.BILL_STAGES[currentIdx + 1];
-    } else if (bill.stage === 'Second Reading' || bill.stage === 'Third Reading') {
-      const vote = calculateBillVote(bill);
-      bill.lastVote = vote;
-      if (vote.passed) {
-        bill.stage = CONFIG.BILL_STAGES[currentIdx + 1];
-        if (bill.stage === 'Royal Assent') {
+  function advanceBillStage(bill, vote) {
+    if (bill.stage === 'Introduced') {
+      // Commons vote — vote result passed in from caller
+      if (vote) {
+        bill.lastVote = vote;
+        if (vote.passed) {
+          bill.stage = 'Royal Assent';
           bill.status = 'passed';
           gameState.billHistory.push({ ...bill, passedTurn: gameState.turn });
           gameState.bills = gameState.bills.filter(b => b.id !== bill.id);
+        } else {
+          bill.status = 'defeated';
+          gameState.billHistory.push({ ...bill, defeatedTurn: gameState.turn });
+          gameState.bills = gameState.bills.filter(b => b.id !== bill.id);
         }
-      } else {
-        bill.status = 'defeated';
-        gameState.billHistory.push({ ...bill, defeatedTurn: gameState.turn });
-        gameState.bills = gameState.bills.filter(b => b.id !== bill.id);
       }
     }
   }
@@ -366,7 +360,7 @@ const Engine = (() => {
       title,
       summary,
       proposer: gameState.playerParty,
-      stage: 'First Reading',
+      stage: 'Introduced',
       status: 'active',
       ideology: ideology || { ...gameState.policy },
       debates: [],

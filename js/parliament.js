@@ -90,29 +90,35 @@ const Parliament = (() => {
   }
 
   function generateFallbackDebate(bill) {
+    const gs = gameState;
     const proposer = PARTIES[bill.proposer];
-    const pm = PARTIES[gameState.pmParty];
-    const opp = PARTIES[gameState.oppositionLeader];
+    const pm = PARTIES[gs.pmParty];
+    const opp = PARTIES[gs.oppositionLeader];
+    const isGovBill = bill.proposer === gs.pmParty;
     const proposerName = proposer?.leader || 'The Minister';
     const oppName = opp?.leader || 'The Opposition Leader';
+    const pmName = gs.pmParty === gs.playerParty ? gs.playerName : (pm?.leader || 'The Prime Minister');
 
-    return `**Mr Speaker:** Order! Order! The House will come to order. We now move to the ${bill.stage} of the ${bill.title}. I call upon the ${proposer?.name || 'Government'} minister to open the debate.
+    const govLabel = isGovBill ? 'Government' : proposer?.name || 'Opposition';
+    const benchReaction = isGovBill ? 'Government' : proposer?.name || 'Opposition';
 
-**${proposerName} (${proposer?.name || 'Government'}):** Mr Speaker, I rise to present this bill to the House. ${bill.summary} This legislation represents a vital step forward for our nation, and I commend it to the House.
+    return `**Mr Speaker:** Order! Order! The House will come to order. We now come to the ${bill.title}. I call upon the ${isGovBill ? 'Minister' : 'Honourable Member for ' + (proposer?.name || 'the Opposition')} to move that the bill be now read.
 
-*[Cries of "Hear, hear!" from the Government benches]*
+**${proposerName} (${proposer?.name}):** Mr Speaker, I rise to present this bill to the House. ${bill.summary} This legislation represents a vital step forward for our nation under this ${pm?.name || 'Government'} government, and I commend it to the House.
 
-**${oppName} (${opp?.name || 'Opposition'}):** Mr Speaker, while we acknowledge the importance of the issue at hand, we have grave concerns about this bill's approach. The Government has once again shown that it is out of touch with the needs of ordinary people.
+*[Cries of "Hear, hear!" from the ${benchReaction} benches]*
 
-*[Cries of "Shame!" from Government benches, cheers from Opposition]*
+**${oppName} (${opp?.name}):** Mr Speaker, ${isGovBill ? 'the Government' : 'the Honourable Member'} asks us to support this measure, yet we on these benches have grave concerns. ${isGovBill ? `The ${pm?.name} government has` : 'This proposal has'} once again shown ${isGovBill ? 'it is' : 'itself to be'} out of touch with the needs of ordinary working people across this country.
+
+*[Cries of "Shame!" from ${benchReaction} benches, cheers from ${isGovBill ? 'Opposition' : 'Government'} benches]*
 
 **Mr Speaker:** Order! The honourable members will contain themselves.
 
-**Backbench MP:** Mr Speaker, will the minister give way? I represent a constituency that will be directly affected by this legislation, and my constituents deserve to know how this will impact their daily lives.
+**Backbench MP:** Mr Speaker, will the ${isGovBill ? 'Minister' : 'Honourable Member'} give way? I represent a constituency that will be directly affected by this legislation, and my constituents deserve answers.
 
-**${proposerName}:** I thank the honourable member for their intervention. I can assure them that this bill has been carefully drafted with constituents exactly like theirs in mind. The impact assessments are clear.
+**${proposerName}:** I thank the honourable member for their intervention. I can assure them and the House that this bill has been carefully drafted with their constituents in mind.
 
-**Mr Speaker:** I think we have heard enough. The question is that the bill be now read a ${bill.stage === 'Second Reading' ? 'second' : 'third'} time. As many as are of that opinion say "Aye."
+**Mr Speaker:** I think we have heard sufficient debate. The Question is that the bill be now read. As many as are of that opinion say "Aye."
 
 *[Cries of "Aye!"]*
 
@@ -120,7 +126,7 @@ const Parliament = (() => {
 
 *[Cries of "No!"]*
 
-**Mr Speaker:** I think the Ayes have it. Division! Clear the lobby!`;
+**Mr Speaker:** Division! Clear the lobbies!`;
   }
 
   // ---- PMQs ----
@@ -252,33 +258,17 @@ ${strategyResponses[strategy] || strategyResponses.defend}
   // ---- Bill Advancement Orchestrator ----
 
   async function advanceBill(bill, onDebateChunk) {
-    const voteStages = ['Second Reading', 'Third Reading'];
-    const isVoteStage = voteStages.includes(bill.stage);
-
-    if (isVoteStage) {
-      // Run debate first, then vote
-      await startDebate(bill, onDebateChunk);
-      const vote = Engine.calculateBillVote(bill);
-      Engine.advanceBillStage(bill);
-      return {
-        type: 'vote',
-        vote,
-        bill,
-        passed: vote.passed,
-        newStage: bill.stage,
-      };
-    } else {
-      // Non-vote stage — advance directly
-      const oldStage = bill.stage;
-      Engine.advanceBillStage(bill);
-      return {
-        type: 'advance',
-        bill,
-        oldStage,
-        newStage: bill.stage,
-        passed: bill.status !== 'defeated',
-      };
-    }
+    // Debate the bill, then vote
+    await startDebate(bill, onDebateChunk);
+    const vote = Engine.calculateBillVote(bill);
+    Engine.advanceBillStage(bill, vote);
+    return {
+      type: 'vote',
+      vote,
+      bill,
+      passed: vote.passed,
+      newStage: bill.stage,
+    };
   }
 
   // ---- Vote Analysis ----

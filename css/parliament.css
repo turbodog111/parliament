@@ -249,6 +249,20 @@
 .whip-count.against .count-value { color: var(--danger); }
 .whip-count.abstain .count-value { color: var(--text-muted); }
 
+/* === DIVISION ANNOUNCEMENT === */
+.division-result-announcement {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--bg-dark);
+  color: var(--gold);
+  border-radius: var(--radius);
+  font-weight: 700;
+  text-align: center;
+}
+.division-result-announcement p {
+  margin: 4px 0;
+}
+
 /* === BILL STAGE INFO === */
 .bill-stage-info {
   margin-top: 16px;

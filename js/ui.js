@@ -395,40 +395,13 @@ const UI = (() => {
 
   // Stage descriptions and action button labels
   const STAGE_INFO = {
-    'First Reading': {
-      text: 'First Reading \u2014 the bill has been formally introduced. Proceed to begin debate on the general principles.',
-      action: 'Proceed to Second Reading',
-      isVote: false,
-    },
-    'Second Reading': {
-      text: 'Second Reading \u2014 the House debates the general principles of the bill. A division (vote) will be called.',
-      action: 'Debate & Vote',
-      isVote: true,
-    },
-    'Committee Stage': {
-      text: 'Committee Stage \u2014 a committee examines the bill clause by clause and may propose amendments.',
-      action: 'Send to Committee',
-      isVote: false,
-    },
-    'Report Stage': {
-      text: 'Report Stage \u2014 the committee reports back to the House with any amendments.',
-      action: 'Receive Report',
-      isVote: false,
-    },
-    'Third Reading': {
-      text: 'Third Reading \u2014 the House debates the final text of the bill. A final division will be called.',
-      action: 'Final Debate & Vote',
-      isVote: true,
-    },
-    'Lords': {
-      text: 'House of Lords \u2014 the bill is sent to the Lords for consideration and approval.',
-      action: 'Send to Lords',
-      isVote: false,
+    'Introduced': {
+      text: 'This bill has been introduced to the House of Commons. Put it to the House to debate and hold a division (vote).',
+      action: 'Put to the House',
     },
     'Royal Assent': {
-      text: 'Royal Assent \u2014 the bill receives Royal Assent and passes into law.',
+      text: 'This bill has passed the Commons and received Royal Assent. It is now an Act of Parliament.',
       action: null,
-      isVote: false,
     },
   };
 
@@ -479,7 +452,7 @@ const UI = (() => {
         actionBtn.textContent = stageInfo.action;
         actionBtn.classList.remove('hidden');
         actionBtn.disabled = false;
-        actionBtn.onclick = () => handleBillAction(bill, stageInfo);
+        actionBtn.onclick = () => handleBillAction(bill);
       } else {
         actionBtn.classList.add('hidden');
       }
@@ -490,67 +463,58 @@ const UI = (() => {
     event?.target?.closest('.bill-item')?.classList.add('active');
   }
 
-  async function handleBillAction(bill, stageInfo) {
+  async function handleBillAction(bill) {
     const actionBtn = $('btnBillAction');
     if (actionBtn) {
       actionBtn.disabled = true;
-      actionBtn.textContent = 'In progress...';
+      actionBtn.textContent = 'Debating...';
     }
 
     // Clear previous vote result
     const voteResult = $('billVoteResult');
     if (voteResult) voteResult.innerHTML = '';
 
-    if (stageInfo.isVote) {
-      // Vote stage: switch to debate tab, run debate + vote, then switch back
-      showParliamentTab('debate');
+    // Switch to debate tab so player sees the transcript stream in
+    showParliamentTab('debate');
 
-      const result = await Parliament.advanceBill(bill);
+    const result = await Parliament.advanceBill(bill);
 
-      // Switch back to bill detail to show vote result
-      showParliamentTab('bills');
+    // Switch back to bill detail to show vote result
+    showParliamentTab('bills');
 
-      if (result.type === 'vote' && result.vote) {
-        renderVoteBreakdown(result.vote);
-
-        if (result.passed) {
-          if (bill.status === 'passed') {
-            showToast(`${bill.title} has received Royal Assent!`, 'success');
-          } else {
-            showToast(`${bill.title} passed! Now at ${result.newStage}.`, 'success');
-          }
-        } else {
-          showToast(`${bill.title} has been defeated.`, 'danger');
-        }
+    if (result.vote) {
+      // Append Speaker announcement to debate transcript
+      const debateContainer = $('debateTranscript');
+      if (debateContainer) {
+        const announcement = document.createElement('div');
+        announcement.className = 'division-result-announcement';
+        const v = result.vote;
+        announcement.innerHTML = renderMarkdown(
+          `\n\n**Mr Speaker:** The Ayes to the right: ${v.ayes}. The Noes to the left: ${v.noes}.\n\n**Mr Speaker:** ${v.passed ? 'The Ayes have it! The Ayes have it!' : 'The Noes have it! The Noes have it!'}`
+        );
+        debateContainer.appendChild(announcement);
       }
-    } else {
-      // Non-vote stage: advance directly
-      const result = await Parliament.advanceBill(bill);
 
-      if (bill.status === 'passed') {
-        showToast(`${bill.title} has received Royal Assent and is now law!`, 'success');
+      renderVoteBreakdown(result.vote);
+
+      if (result.passed) {
+        showToast(`${bill.title} has passed and received Royal Assent!`, 'success');
       } else {
-        showToast(`${bill.title} advanced to ${result.newStage}.`, 'success');
+        showToast(`${bill.title} has been defeated.`, 'danger');
       }
     }
 
-    // Re-render parliament sidebar and re-select bill if still active
+    // Re-render parliament sidebar
     renderParliament();
 
-    // If bill is still active, re-select it to update stage display
-    const stillActive = gameState.bills.find(b => b.id === bill.id);
-    if (stillActive) {
-      selectBill(stillActive);
-    } else {
-      // Bill passed or defeated — show empty detail or hide
-      const detailTitle = $('billDetailTitle');
-      if (detailTitle) detailTitle.textContent = bill.title;
-      const infoEl = $('billStageInfo');
-      if (infoEl) infoEl.textContent = bill.status === 'passed'
-        ? 'This bill has received Royal Assent and is now an Act of Parliament.'
-        : 'This bill was defeated in the House of Commons.';
-      if (actionBtn) actionBtn.classList.add('hidden');
-    }
+    // Bill is now in history — update detail view
+    const detailTitle = $('billDetailTitle');
+    if (detailTitle) detailTitle.textContent = bill.title;
+    const infoEl = $('billStageInfo');
+    if (infoEl) infoEl.textContent = bill.status === 'passed'
+      ? 'This bill has passed the House of Commons and received Royal Assent. It is now an Act of Parliament.'
+      : 'This bill was defeated in a division of the House of Commons.';
+    if (actionBtn) actionBtn.classList.add('hidden');
 
     renderDashboard();
   }

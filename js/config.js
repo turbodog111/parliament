@@ -36,14 +36,9 @@ const CONFIG = {
   CAMPAIGN_FUNDS_PER_TURN: 100,
   CAMPAIGN_ACTIVISTS_PER_TURN: 50,
 
-  // Bill stages
+  // Bill stages (simplified: introduced → Commons vote → law)
   BILL_STAGES: [
-    'First Reading',
-    'Second Reading',
-    'Committee Stage',
-    'Report Stage',
-    'Third Reading',
-    'Lords',
+    'Introduced',
     'Royal Assent'
   ],
 
