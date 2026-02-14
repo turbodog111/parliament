@@ -63,10 +63,11 @@ const Engine = (() => {
 
     const constituencyResults = [];
 
-    // Calculate national swing from baseline
+    // Calculate national swing from last election result
+    const lastPolling = gs.lastElectionPolling || BASELINE_POLLING;
     const swings = {};
     Object.keys(gs.polling).forEach(p => {
-      swings[p] = (gs.polling[p] || 0) - (BASELINE_POLLING[p] || 0);
+      swings[p] = (gs.polling[p] || 0) - (lastPolling[p] || 0);
     });
 
     CONSTITUENCIES.forEach(con => {
@@ -286,11 +287,9 @@ const Engine = (() => {
     const unityDrift = (60 - gs.unity) * 0.03;
     gs.unity = clamp(Math.round(gs.unity + unityDrift), 0, 100);
 
-    // Resource generation
-    if (gs.phase === 'campaign') {
-      gs.campaignResources.funds += CONFIG.CAMPAIGN_FUNDS_PER_TURN;
-      gs.campaignResources.activists += CONFIG.CAMPAIGN_ACTIVISTS_PER_TURN;
-    }
+    // Resource generation — funds and activists grow each turn
+    gs.partyFunds += CONFIG.CAMPAIGN_FUNDS_PER_TURN;
+    gs.activists += CONFIG.CAMPAIGN_ACTIVISTS_PER_TURN;
 
     // Save
     saveGame();
@@ -377,10 +376,6 @@ const Engine = (() => {
   function callElection() {
     const gs = gameState;
     gs.phase = 'campaign';
-    gs.campaignResources = {
-      funds: gs.partyFunds,
-      activists: gs.activists,
-    };
     gs.campaignTargets = [];
     saveGame();
   }
@@ -389,8 +384,9 @@ const Engine = (() => {
     const gs = gameState;
     const result = calculateElection();
 
-    // Store results
+    // Store results and snapshot polling as new baseline for next election
     gs.seats = result.seats;
+    gs.lastElectionPolling = { ...gs.polling };
     gs.electionCount++;
     gs.electionHistory.push({
       turn: gs.turn,

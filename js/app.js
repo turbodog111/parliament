@@ -348,6 +348,12 @@
   }
 
   async function runElectionFromCampaign() {
+    // Guard: only allow during campaign phase
+    if (!gameState || gameState.phase !== 'campaign') {
+      showToast('No election has been called!', 'danger');
+      return;
+    }
+
     const btn = $('btnRunElection');
     if (btn) {
       btn.disabled = true;

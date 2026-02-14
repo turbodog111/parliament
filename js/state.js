@@ -99,6 +99,7 @@ function createGameState(playerParty, playerName) {
 
     // Election results history
     electionHistory: [],
+    lastElectionPolling: { ...BASELINE_POLLING },
 
     // Settings
     ollamaEndpoint: CONFIG.OLLAMA_ENDPOINT,

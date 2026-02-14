@@ -275,6 +275,12 @@
   color: var(--bg-darkest);
   font-weight: 700;
 }
+.election-timing-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  align-self: center;
+}
 
 /* === RESPONSIVE === */
 @media (max-width: 900px) {

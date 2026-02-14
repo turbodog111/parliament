@@ -71,14 +71,36 @@ const UI = (() => {
     bar.innerHTML = '';
 
     const gs = gameState;
-    const sorted = PARTY_ORDER.filter(p => (gs.seats[p] || 0) > 0);
+    const allParties = PARTY_ORDER.filter(p => (gs.seats[p] || 0) > 0);
 
     // Add independents and others
-    if (gs.seats.ind > 0) sorted.push('ind');
-    if (gs.seats.speaker > 0) sorted.push('speaker');
-    if (gs.seats.other > 0) sorted.push('other');
+    if (gs.seats.ind > 0) allParties.push('ind');
+    if (gs.seats.speaker > 0) allParties.push('speaker');
+    if (gs.seats.other > 0) allParties.push('other');
 
-    sorted.forEach(p => {
+    // Sort: opposition on left, crossbench/minor centre, government on right
+    const govParties = [gs.pmParty, ...gs.coalitionPartners];
+    const opposition = [];
+    const crossbench = [];
+    const government = [];
+
+    allParties.forEach(p => {
+      if (govParties.includes(p)) {
+        government.push(p);
+      } else if (p === 'speaker' || p === 'ind' || p === 'other') {
+        crossbench.push(p);
+      } else {
+        opposition.push(p);
+      }
+    });
+
+    // Sort each group by seats descending
+    opposition.sort((a, b) => (gs.seats[b] || 0) - (gs.seats[a] || 0));
+    government.sort((a, b) => (gs.seats[b] || 0) - (gs.seats[a] || 0));
+
+    const displayOrder = [...opposition, ...crossbench, ...government];
+
+    displayOrder.forEach(p => {
       const seats = gs.seats[p] || 0;
       if (seats === 0) return;
       const pct = (seats / CONFIG.TOTAL_SEATS * 100);
@@ -93,11 +115,11 @@ const UI = (() => {
       bar.appendChild(seg);
     });
 
-    // Legend
+    // Legend (same order)
     const legend = $('seatLegend');
     if (legend) {
       legend.innerHTML = '';
-      sorted.forEach(p => {
+      displayOrder.forEach(p => {
         const seats = gs.seats[p] || 0;
         if (seats === 0) return;
         const item = document.createElement('div');
@@ -162,10 +184,33 @@ const UI = (() => {
     const gs = gameState;
     const btnElection = $('btnCallElection');
     if (btnElection) {
-      btnElection.disabled = !Engine.canCallElection();
-      btnElection.title = Engine.canCallElection() ? 'Call a General Election' :
-        gs.isInGovernment ? `Cannot call election yet (${CONFIG.MIN_ELECTION_TURNS - gs.turnsInParliament} months remaining)` :
-        'Only the PM can call an election';
+      const canCall = Engine.canCallElection();
+      btnElection.disabled = !canCall;
+
+      if (canCall) {
+        btnElection.title = 'Call a General Election';
+      } else if (!gs.isInGovernment) {
+        btnElection.title = 'Only the PM can call an election';
+      } else {
+        const monthsLeft = Math.max(0, CONFIG.MIN_ELECTION_TURNS - gs.turnsInParliament);
+        btnElection.title = `Cannot call election for ${monthsLeft} more month${monthsLeft !== 1 ? 's' : ''}`;
+      }
+    }
+
+    // Election timing info
+    const electionInfo = $('electionTimingInfo');
+    if (electionInfo) {
+      const mandatoryLeft = Math.max(0, CONFIG.TURNS_PER_PARLIAMENT - gs.turnsInParliament);
+      if (gs.phase === 'campaign') {
+        electionInfo.textContent = 'Election called — campaign in progress';
+      } else if (!gs.isInGovernment) {
+        electionInfo.textContent = `Opposition — election due in ${mandatoryLeft} month${mandatoryLeft !== 1 ? 's' : ''}`;
+      } else if (Engine.canCallElection()) {
+        electionInfo.textContent = `May call election now — must be held within ${mandatoryLeft} month${mandatoryLeft !== 1 ? 's' : ''}`;
+      } else {
+        const earlyLeft = Math.max(0, CONFIG.MIN_ELECTION_TURNS - gs.turnsInParliament);
+        electionInfo.textContent = `Earliest election in ${earlyLeft} month${earlyLeft !== 1 ? 's' : ''} — must be held within ${mandatoryLeft}`;
+      }
     }
 
     const btnPMQ = $('btnPMQs');
@@ -279,9 +324,15 @@ const UI = (() => {
     const gs = gameState;
     if (!gs) return;
 
-    // Resources
-    setText('campFunds', gs.campaignResources?.funds || 0);
-    setText('campActivists', gs.campaignResources?.activists || 0);
+    // Resources — use main party funds/activists
+    setText('campFunds', gs.partyFunds || 0);
+    setText('campActivists', gs.activists || 0);
+
+    // Show/hide election button based on phase
+    const btnRunElection = $('btnRunElection');
+    if (btnRunElection) {
+      btnRunElection.classList.toggle('hidden', gs.phase !== 'campaign');
+    }
 
     // Region grid
     const grid = $('regionGrid');

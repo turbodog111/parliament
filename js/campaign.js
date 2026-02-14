@@ -67,11 +67,11 @@ const Campaign = (() => {
     const gs = gameState;
     const cost = { funds: 50, activists: 25 };
 
-    if (gs.campaignResources.funds < cost.funds) {
+    if (gs.partyFunds < cost.funds) {
       showToast('Not enough funds!', 'danger');
       return false;
     }
-    if (gs.campaignResources.activists < cost.activists) {
+    if (gs.activists < cost.activists) {
       showToast('Not enough activists!', 'danger');
       return false;
     }
@@ -81,8 +81,8 @@ const Campaign = (() => {
       return false;
     }
 
-    gs.campaignResources.funds -= cost.funds;
-    gs.campaignResources.activists -= cost.activists;
+    gs.partyFunds -= cost.funds;
+    gs.activists -= cost.activists;
     gs.campaignTargets.push(region);
 
     // Apply polling boost in region
@@ -118,13 +118,13 @@ const Campaign = (() => {
     const gs = gameState;
     const cost = { funds: 30, activists: 15 };
 
-    if (gs.campaignResources.funds < cost.funds || gs.campaignResources.activists < cost.activists) {
+    if (gs.partyFunds < cost.funds || gs.activists < cost.activists) {
       showToast('Not enough resources!', 'danger');
       return false;
     }
 
-    gs.campaignResources.funds -= cost.funds;
-    gs.campaignResources.activists -= cost.activists;
+    gs.partyFunds -= cost.funds;
+    gs.activists -= cost.activists;
 
     // Rally effect
     const roll = Math.random();
@@ -146,13 +146,13 @@ const Campaign = (() => {
     const gs = gameState;
     const cost = { funds: 10, activists: 30 };
 
-    if (gs.campaignResources.funds < cost.funds || gs.campaignResources.activists < cost.activists) {
+    if (gs.partyFunds < cost.funds || gs.activists < cost.activists) {
       showToast('Not enough resources!', 'danger');
       return false;
     }
 
-    gs.campaignResources.funds -= cost.funds;
-    gs.campaignResources.activists -= cost.activists;
+    gs.partyFunds -= cost.funds;
+    gs.activists -= cost.activists;
 
     // Doorknocking is reliable but modest
     applyRegionalBoost(region, 0.7);
@@ -166,13 +166,13 @@ const Campaign = (() => {
     const gs = gameState;
     const cost = { funds: 80, activists: 5 };
 
-    if (gs.campaignResources.funds < cost.funds) {
+    if (gs.partyFunds < cost.funds) {
       showToast('Not enough funds!', 'danger');
       return false;
     }
 
-    gs.campaignResources.funds -= cost.funds;
-    gs.campaignResources.activists -= cost.activists;
+    gs.partyFunds -= cost.funds;
+    gs.activists -= cost.activists;
 
     // Ads are expensive but effective
     const roll = Math.random();
@@ -205,18 +205,6 @@ const Campaign = (() => {
     saveGame();
   }
 
-  // ---- Start Campaign ----
-
-  function startCampaign() {
-    gameState.phase = 'campaign';
-    gameState.campaignResources = {
-      funds: gameState.partyFunds,
-      activists: gameState.activists,
-    };
-    gameState.campaignTargets = [];
-    saveGame();
-  }
-
   // ---- Election Projection ----
 
   function getProjection() {
@@ -232,7 +220,6 @@ const Campaign = (() => {
     doorknock,
     runAd,
     shiftPolicy,
-    startCampaign,
     getProjection,
   };
 })();
