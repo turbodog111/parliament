@@ -249,23 +249,36 @@ ${strategyResponses[strategy] || strategyResponses.defend}
     showToast(`PMQs concluded. Approval ${effects.approval >= 0 ? '+' : ''}${effects.approval}%`, effects.approval >= 0 ? 'success' : 'danger');
   }
 
-  // ---- Vote Whipping ----
+  // ---- Bill Advancement Orchestrator ----
 
-  async function whipVote(bill) {
-    // Get base vote prediction
-    const vote = Engine.calculateBillVote(bill);
+  async function advanceBill(bill, onDebateChunk) {
+    const voteStages = ['Second Reading', 'Third Reading'];
+    const isVoteStage = voteStages.includes(bill.stage);
 
-    // Whipping can improve the result at cost of unity
-    const whipBonus = Math.floor(gameState.governmentBudget * 0.05);
-    vote.ayes += whipBonus;
-    vote.majority = vote.ayes - vote.noes;
-    vote.passed = vote.ayes > vote.noes;
-
-    // Spend political capital
-    gameState.governmentBudget = Math.max(0, gameState.governmentBudget - 10);
-    gameState.unity = clamp(gameState.unity - 3, 0, 100);
-
-    return vote;
+    if (isVoteStage) {
+      // Run debate first, then vote
+      await startDebate(bill, onDebateChunk);
+      const vote = Engine.calculateBillVote(bill);
+      Engine.advanceBillStage(bill);
+      return {
+        type: 'vote',
+        vote,
+        bill,
+        passed: vote.passed,
+        newStage: bill.stage,
+      };
+    } else {
+      // Non-vote stage — advance directly
+      const oldStage = bill.stage;
+      Engine.advanceBillStage(bill);
+      return {
+        type: 'advance',
+        bill,
+        oldStage,
+        newStage: bill.stage,
+        passed: bill.status !== 'defeated',
+      };
+    }
   }
 
   // ---- Vote Analysis ----
@@ -295,8 +308,8 @@ ${strategyResponses[strategy] || strategyResponses.defend}
     getBills,
     getBillHistory,
     startDebate,
+    advanceBill,
     startPMQs,
-    whipVote,
     analyseVote,
   };
 })();

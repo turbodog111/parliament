@@ -191,17 +191,19 @@ const Engine = (() => {
     let ayes = 0;
     let noes = 0;
     let abstentions = 0;
+    const partyBreakdown = {};
 
     PARTY_ORDER.forEach(partyId => {
       const party = PARTIES[partyId];
       if (!party) return;
-      if (party.abstentionist) {
-        abstentions += gs.seats[partyId] || 0;
-        return;
-      }
-
       const seats = gs.seats[partyId] || 0;
       if (seats === 0) return;
+
+      if (party.abstentionist) {
+        abstentions += seats;
+        partyBreakdown[partyId] = { ayes: 0, noes: 0, seats, abstain: true };
+        return;
+      }
 
       // Calculate ideological alignment with bill
       let alignment = 0;
@@ -221,29 +223,49 @@ const Engine = (() => {
       const isGovernment = partyId === gs.pmParty || gs.coalitionPartners.includes(partyId);
       const isProposer = partyId === bill.proposer;
 
+      let partyAyes = 0;
+      let partyNoes = 0;
+
       if (isGovernment || isProposer) {
-        // Government party — most vote aye, some rebels
-        const rebelRate = isProposer ? 0.05 : 0.1;
-        const unityFactor = partyId === gs.playerParty ? gs.unity / 100 : 0.8;
-        const rebels = Math.floor(seats * rebelRate * (1 - unityFactor));
-        ayes += seats - rebels;
-        noes += rebels;
+        // Government party — higher rebellion rates for balance
+        const rebelRate = isProposer ? 0.15 : 0.2;
+        const unityFactor = partyId === gs.playerParty ? gs.unity / 100 : 0.75;
+        const rebels = Math.floor(seats * rebelRate * (1 - unityFactor * 0.7));
+        partyAyes = seats - rebels;
+        partyNoes = rebels;
       } else {
-        // Opposition — vote based on ideology alignment
-        if (alignment > 0.6) {
-          ayes += Math.floor(seats * alignment);
-          noes += seats - Math.floor(seats * alignment);
+        // Opposition — vote based on ideology alignment with more resistance
+        if (alignment > 0.65) {
+          // High alignment — some cross-party support
+          const supportRate = alignment * 0.6;
+          partyAyes = Math.floor(seats * supportRate);
+          partyNoes = seats - partyAyes;
+        } else if (alignment > 0.4) {
+          // Mixed — mostly oppose but some support
+          const supportRate = alignment * 0.3;
+          partyAyes = Math.floor(seats * supportRate);
+          partyNoes = seats - partyAyes;
         } else {
-          noes += Math.floor(seats * (1 - alignment));
-          ayes += seats - Math.floor(seats * (1 - alignment));
+          // Low alignment — firm opposition
+          partyAyes = Math.floor(seats * 0.05);
+          partyNoes = seats - partyAyes;
         }
       }
+
+      // Add random noise per party (±5 seats, clamped)
+      const noise = randInt(-5, 5);
+      partyAyes = Math.max(0, Math.min(seats, partyAyes + noise));
+      partyNoes = seats - partyAyes;
+
+      ayes += partyAyes;
+      noes += partyNoes;
+      partyBreakdown[partyId] = { ayes: partyAyes, noes: partyNoes, seats };
     });
 
     // Speaker doesn't vote (except tie-break)
     const passed = ayes > noes;
 
-    return { ayes, noes, abstentions, passed, majority: ayes - noes };
+    return { ayes, noes, abstentions, passed, majority: ayes - noes, partyBreakdown };
   }
 
   // ---- Turn Advancement ----
@@ -263,13 +285,6 @@ const Engine = (() => {
     // Unity drift — tends toward 60
     const unityDrift = (60 - gs.unity) * 0.03;
     gs.unity = clamp(Math.round(gs.unity + unityDrift), 0, 100);
-
-    // Advance active bills
-    gs.bills.forEach(bill => {
-      if (bill.status === 'active' && Math.random() < 0.3) {
-        advanceBillStage(bill);
-      }
-    });
 
     // Resource generation
     if (gs.phase === 'campaign') {
@@ -432,6 +447,7 @@ const Engine = (() => {
     calculateElection,
     determineGovernment,
     calculateBillVote,
+    advanceBillStage,
     advanceTurn,
     applyEventEffects,
     createBill,

@@ -393,8 +393,54 @@ const UI = (() => {
     }
   }
 
+  // Stage descriptions and action button labels
+  const STAGE_INFO = {
+    'First Reading': {
+      text: 'First Reading \u2014 the bill has been formally introduced. Proceed to begin debate on the general principles.',
+      action: 'Proceed to Second Reading',
+      isVote: false,
+    },
+    'Second Reading': {
+      text: 'Second Reading \u2014 the House debates the general principles of the bill. A division (vote) will be called.',
+      action: 'Debate & Vote',
+      isVote: true,
+    },
+    'Committee Stage': {
+      text: 'Committee Stage \u2014 a committee examines the bill clause by clause and may propose amendments.',
+      action: 'Send to Committee',
+      isVote: false,
+    },
+    'Report Stage': {
+      text: 'Report Stage \u2014 the committee reports back to the House with any amendments.',
+      action: 'Receive Report',
+      isVote: false,
+    },
+    'Third Reading': {
+      text: 'Third Reading \u2014 the House debates the final text of the bill. A final division will be called.',
+      action: 'Final Debate & Vote',
+      isVote: true,
+    },
+    'Lords': {
+      text: 'House of Lords \u2014 the bill is sent to the Lords for consideration and approval.',
+      action: 'Send to Lords',
+      isVote: false,
+    },
+    'Royal Assent': {
+      text: 'Royal Assent \u2014 the bill receives Royal Assent and passes into law.',
+      action: null,
+      isVote: false,
+    },
+  };
+
+  let selectedBill = null;
+
   function selectBill(bill) {
-    // Show bill details and stages
+    selectedBill = bill;
+
+    // Show bill detail view tab
+    showParliamentTab('bills');
+
+    // Render stage pipeline
     const stagesEl = $('billStages');
     if (stagesEl) {
       stagesEl.innerHTML = '';
@@ -415,43 +461,159 @@ const UI = (() => {
     const detailSummary = $('billDetailSummary');
     if (detailSummary) detailSummary.textContent = bill.summary;
 
-    // Show debate/whip buttons
-    const debateBtn = $('btnDebate');
-    if (debateBtn) {
-      debateBtn.onclick = async () => {
-        debateBtn.disabled = true;
-        await Parliament.startDebate(bill);
-        debateBtn.disabled = false;
-      };
+    // Stage info
+    const stageInfo = STAGE_INFO[bill.stage];
+    const infoEl = $('billStageInfo');
+    if (infoEl) {
+      infoEl.textContent = stageInfo ? stageInfo.text : '';
     }
 
-    const whipBtn = $('btnWhipVote');
-    if (whipBtn) {
-      whipBtn.onclick = async () => {
-        const vote = await Parliament.whipVote(bill);
-        renderWhipResult(vote);
-      };
+    // Clear previous vote result
+    const voteResult = $('billVoteResult');
+    if (voteResult) voteResult.innerHTML = '';
+
+    // Action button
+    const actionBtn = $('btnBillAction');
+    if (actionBtn) {
+      if (stageInfo && stageInfo.action) {
+        actionBtn.textContent = stageInfo.action;
+        actionBtn.classList.remove('hidden');
+        actionBtn.disabled = false;
+        actionBtn.onclick = () => handleBillAction(bill, stageInfo);
+      } else {
+        actionBtn.classList.add('hidden');
+      }
     }
 
-    // Highlight selected bill
+    // Highlight selected bill in sidebar
     $$('.bill-item').forEach(el => el.classList.remove('active'));
     event?.target?.closest('.bill-item')?.classList.add('active');
   }
 
-  function renderWhipResult(vote) {
-    const panel = $('whipResult');
+  async function handleBillAction(bill, stageInfo) {
+    const actionBtn = $('btnBillAction');
+    if (actionBtn) {
+      actionBtn.disabled = true;
+      actionBtn.textContent = 'In progress...';
+    }
+
+    // Clear previous vote result
+    const voteResult = $('billVoteResult');
+    if (voteResult) voteResult.innerHTML = '';
+
+    if (stageInfo.isVote) {
+      // Vote stage: switch to debate tab, run debate + vote, then switch back
+      showParliamentTab('debate');
+
+      const result = await Parliament.advanceBill(bill);
+
+      // Switch back to bill detail to show vote result
+      showParliamentTab('bills');
+
+      if (result.type === 'vote' && result.vote) {
+        renderVoteBreakdown(result.vote);
+
+        if (result.passed) {
+          if (bill.status === 'passed') {
+            showToast(`${bill.title} has received Royal Assent!`, 'success');
+          } else {
+            showToast(`${bill.title} passed! Now at ${result.newStage}.`, 'success');
+          }
+        } else {
+          showToast(`${bill.title} has been defeated.`, 'danger');
+        }
+      }
+    } else {
+      // Non-vote stage: advance directly
+      const result = await Parliament.advanceBill(bill);
+
+      if (bill.status === 'passed') {
+        showToast(`${bill.title} has received Royal Assent and is now law!`, 'success');
+      } else {
+        showToast(`${bill.title} advanced to ${result.newStage}.`, 'success');
+      }
+    }
+
+    // Re-render parliament sidebar and re-select bill if still active
+    renderParliament();
+
+    // If bill is still active, re-select it to update stage display
+    const stillActive = gameState.bills.find(b => b.id === bill.id);
+    if (stillActive) {
+      selectBill(stillActive);
+    } else {
+      // Bill passed or defeated — show empty detail or hide
+      const detailTitle = $('billDetailTitle');
+      if (detailTitle) detailTitle.textContent = bill.title;
+      const infoEl = $('billStageInfo');
+      if (infoEl) infoEl.textContent = bill.status === 'passed'
+        ? 'This bill has received Royal Assent and is now an Act of Parliament.'
+        : 'This bill was defeated in the House of Commons.';
+      if (actionBtn) actionBtn.classList.add('hidden');
+    }
+
+    renderDashboard();
+  }
+
+  function renderVoteBreakdown(vote) {
+    const panel = $('billVoteResult');
     if (!panel) return;
-    panel.innerHTML = `
-      <div class="whip-summary">
-        <div class="whip-count for"><div class="count-value">${vote.ayes}</div><div class="count-label">Ayes</div></div>
-        <div class="whip-count against"><div class="count-value">${vote.noes}</div><div class="count-label">Noes</div></div>
-        <div class="whip-count abstain"><div class="count-value">${vote.abstentions}</div><div class="count-label">Abstain</div></div>
-      </div>
-      <div class="text-center" style="font-weight:700;font-size:1.1rem;color:${vote.passed ? 'var(--success)' : 'var(--danger)'}">
-        ${vote.passed ? 'The Ayes have it!' : 'The Noes have it!'}
-      </div>
-      <div class="text-center text-muted text-sm mt-sm">Majority: ${Math.abs(vote.majority)}</div>
+
+    // Header
+    const passed = vote.passed;
+    let html = `
+      <div class="vote-breakdown">
+        <div class="vote-breakdown-header" style="color:${passed ? 'var(--success)' : 'var(--danger)'}">
+          ${passed ? 'The Ayes have it!' : 'The Noes have it!'}
+        </div>
+        <div class="whip-summary">
+          <div class="whip-count for"><div class="count-value">${vote.ayes}</div><div class="count-label">Ayes</div></div>
+          <div class="whip-count against"><div class="count-value">${vote.noes}</div><div class="count-label">Noes</div></div>
+          <div class="whip-count abstain"><div class="count-value">${vote.abstentions}</div><div class="count-label">Abstain</div></div>
+        </div>
+        <div class="text-center text-muted text-sm mb-md">Majority: ${Math.abs(vote.majority)}</div>
     `;
+
+    // Party-by-party breakdown table
+    if (vote.partyBreakdown) {
+      html += `<table class="vote-breakdown-table">
+        <thead><tr><th>Party</th><th>Seats</th><th>Ayes</th><th>Noes</th></tr></thead><tbody>`;
+
+      const entries = Object.entries(vote.partyBreakdown)
+        .filter(([, data]) => data.seats > 0)
+        .sort((a, b) => b[1].seats - a[1].seats);
+
+      entries.forEach(([partyId, data]) => {
+        const color = getPartyColor(partyId);
+        const name = getPartyName(partyId);
+        if (data.abstain) {
+          html += `<tr class="vote-party-row">
+            <td><span class="dot" style="background:${color}"></span>${name}</td>
+            <td>${data.seats}</td>
+            <td colspan="2" style="text-align:center;color:var(--text-muted)">Abstain</td>
+          </tr>`;
+        } else {
+          html += `<tr class="vote-party-row">
+            <td><span class="dot" style="background:${color}"></span>${name}</td>
+            <td>${data.seats}</td>
+            <td style="color:var(--success);font-weight:700">${data.ayes}</td>
+            <td style="color:var(--danger);font-weight:700">${data.noes}</td>
+          </tr>`;
+        }
+      });
+
+      html += `<tr class="vote-party-row" style="font-weight:700;border-top:2px solid var(--parchment-dark)">
+        <td>Total</td>
+        <td></td>
+        <td style="color:var(--success)">${vote.ayes}</td>
+        <td style="color:var(--danger)">${vote.noes}</td>
+      </tr>`;
+
+      html += `</tbody></table>`;
+    }
+
+    html += `</div>`;
+    panel.innerHTML = html;
   }
 
   // ---- Election Night ----
@@ -1065,6 +1227,7 @@ const UI = (() => {
     renderEventCard,
     renderCampaign,
     renderParliament,
+    renderVoteBreakdown,
     renderElectionNight,
     animateElectionNight,
     renderSetup,
