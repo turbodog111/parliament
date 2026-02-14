@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parliament — British Election Simulator</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/campaign.css">
+  <link rel="stylesheet" href="css/parliament.css">
+  <link rel="stylesheet" href="css/events.css">
+  <style>
+    /* Title screen */
+    .title-bg {
+      background: linear-gradient(135deg, var(--bg-darkest) 0%, var(--bg-dark) 50%, #2A4A5B 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      color: var(--text-light);
+    }
+    .title-crest {
+      width: 120px;
+      height: 120px;
+      background: var(--gold);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.5rem;
+      margin-bottom: 20px;
+      box-shadow: 0 0 40px rgba(200,169,81,0.3);
+      color: var(--bg-darkest);
+      font-weight: 700;
+    }
+    .title-bg h1 {
+      font-size: 3rem;
+      color: var(--gold);
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+    }
+    .title-bg .subtitle {
+      color: var(--text-mid);
+      font-size: 1.1rem;
+      margin-bottom: 40px;
+      font-style: italic;
+    }
+    .title-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 260px;
+    }
+    /* Setup screen */
+    .setup-screen {
+      background: var(--parchment);
+      padding: 40px 20px;
+      align-items: center;
+    }
+    .setup-container {
+      max-width: 800px;
+      width: 100%;
+    }
+    .setup-container h2 {
+      text-align: center;
+      color: var(--bg-dark);
+      margin-bottom: 24px;
+    }
+    #partyGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .setup-form {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+
+<!-- =============== SCREEN: Title =============== -->
+<div class="screen active" id="screenTitle">
+  <div class="title-bg">
+    <div class="title-crest">HC</div>
+    <h1>PARLIAMENT</h1>
+    <div class="subtitle">British Election Simulator</div>
+    <div class="title-buttons">
+      <button class="btn btn-primary btn-lg btn-block" id="btnNewGame">New Game</button>
+      <button class="btn btn-secondary btn-lg btn-block hidden" id="btnContinue">Continue</button>
+    </div>
+    <div class="text-xs text-muted" style="margin-top:32px;opacity:0.6">
+      Campaign. Govern. Lead. &mdash; AI-enriched by Ollama
+    </div>
+  </div>
+</div>
+
+<!-- =============== SCREEN: Setup =============== -->
+<div class="screen" id="screenSetup">
+  <div class="setup-screen">
+    <div class="setup-container">
+      <h2>Choose Your Party</h2>
+      <div id="partyGrid"></div>
+      <input type="hidden" id="setupPartyInput" value="">
+      <div class="text-center mb-md">
+        <span class="text-muted">Selected: </span><strong id="setupPartyName">None</strong>
+      </div>
+      <div class="setup-form">
+        <div class="form-group">
+          <label for="playerNameInput">Your Name (Party Leader)</label>
+          <input type="text" id="playerNameInput" placeholder="Enter your name..." maxlength="40">
+        </div>
+        <div class="flex gap-sm">
+          <button class="btn btn-ghost flex-1" id="btnBackToTitle">Back</button>
+          <button class="btn btn-primary flex-1" id="btnStartGame">Start Game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== SCREEN: Dashboard =============== -->
+<div class="screen" id="screenDashboard">
+  <!-- Header -->
+  <div class="game-header">
+    <div class="party-badge" id="headerBadge">LAB</div>
+    <div class="header-info">
+      <h3 id="headerName">Player Name</h3>
+      <small><span id="headerDate">July 2024</span> &mdash; <span id="headerPhase">In Government</span></small>
+    </div>
+    <div class="header-actions">
+      <button id="btnSettings" title="Settings">Settings</button>
+    </div>
+  </div>
+
+  <!-- Stat Bar -->
+  <div class="stat-bar">
+    <div class="stat-item"><span class="stat-value" id="statSeats">0</span><span class="stat-label">Seats</span></div>
+    <div class="stat-item"><span class="stat-value" id="statApproval">45%</span><span class="stat-label">Approval</span></div>
+    <div class="stat-item"><span class="stat-value" id="statUnity">70%</span><span class="stat-label">Unity</span></div>
+    <div class="stat-item"><span class="stat-value" id="statPolling">33%</span><span class="stat-label">Polling</span></div>
+    <div class="stat-item"><span class="stat-value" id="statFunds">500</span><span class="stat-label">Funds</span></div>
+    <div class="stat-item"><span class="stat-value" id="statTurn">0/60</span><span class="stat-label">Term</span></div>
+  </div>
+
+  <!-- Dashboard Body -->
+  <div class="dashboard-body">
+    <!-- Main Content -->
+    <div class="dashboard-main">
+      <!-- Event Card -->
+      <div class="event-card hidden" id="eventCard">
+        <span class="event-severity" id="eventSeverity">moderate</span>
+        <div class="event-category" id="eventCategory"></div>
+        <h3 id="eventTitle">Event Title</h3>
+        <div class="event-desc" id="eventDesc">Event description here.</div>
+        <div class="event-choices" id="eventChoices"></div>
+      </div>
+
+      <!-- Dashboard Panels -->
+      <div class="dashboard-panels">
+        <div class="card">
+          <div class="card-header">Seat Distribution</div>
+          <div class="stacked-bar" id="seatBar"></div>
+          <div class="majority-line"></div>
+          <div class="seat-legend" id="seatLegend"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">Approval Rating</div>
+          <div class="approval-display">
+            <div class="approval-number" id="approvalNumber">45%</div>
+            <div>
+              <div class="approval-trend" id="approvalTrend">—</div>
+              <div class="meter" style="width:120px">
+                <div class="meter-fill info" id="approvalMeter" style="width:45%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header">National Polling</div>
+          <div class="polling-bars" id="pollingBars"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar: News Feed -->
+    <div class="dashboard-sidebar">
+      <div style="padding:16px;border-bottom:1px solid var(--parchment-dark)">
+        <h3 style="color:var(--bg-dark)">News Feed</h3>
+      </div>
+      <div class="news-feed" id="newsFeed">
+        <div class="news-item">
+          <div class="news-source bbc">BBC News</div>
+          <div class="news-headline">New government settles into Downing Street</div>
+          <div class="news-date">July 2024</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <button class="btn btn-secondary btn-sm" id="btnProposeBill">Propose Bill</button>
+    <button class="btn btn-secondary btn-sm" id="btnParliament">Parliament</button>
+    <button class="btn btn-secondary btn-sm" id="btnCampaignView">Campaign</button>
+    <button class="btn btn-secondary btn-sm" id="btnCallElection">Call Election</button>
+    <button class="btn btn-secondary btn-sm" id="btnPMQs">PMQs</button>
+    <button class="btn btn-advance btn-sm" id="btnAdvanceMonth">Advance Month</button>
+  </div>
+</div>
+
+<!-- =============== SCREEN: Parliament =============== -->
+<div class="screen" id="screenParliament">
+  <div class="game-header">
+    <button class="btn btn-ghost btn-sm" id="btnBackDashboard" style="color:var(--gold)">← Dashboard</button>
+    <div class="header-info"><h3>House of Commons</h3></div>
+  </div>
+
+  <div class="parliament-body">
+    <div class="parliament-main">
+      <!-- Chamber Header -->
+      <div class="chamber-header">
+        <h3>The Chamber</h3>
+        <div class="chamber-tabs">
+          <button class="chamber-tab active" data-tab="debate">Debate</button>
+          <button class="chamber-tab" data-tab="pmq">PMQs</button>
+          <button class="chamber-tab" data-tab="bills">Bills</button>
+        </div>
+      </div>
+
+      <!-- Debate View -->
+      <div class="debate-view" id="debateView">
+        <div class="streaming-text" id="debateTranscript">
+          <p class="text-muted text-center">Select a bill and start a debate to see Parliamentary proceedings here.</p>
+        </div>
+      </div>
+
+      <!-- PMQ View -->
+      <div class="pmq-view hidden" id="pmqView">
+        <div class="pmq-transcript" id="pmqTranscript">
+          <p class="text-muted text-center">Start PMQs from the Dashboard to see the exchange here.</p>
+        </div>
+      </div>
+
+      <!-- Bill Detail View -->
+      <div class="hidden" id="billDetailView" style="padding:16px;overflow-y:auto;flex:1">
+        <h3 id="billDetailTitle">Bill Title</h3>
+        <p id="billDetailSummary" class="text-muted mb-md">Bill summary</p>
+        <div class="bill-pipeline" id="billStages"></div>
+        <div class="flex gap-sm mt-md">
+          <button class="btn btn-secondary btn-sm" id="btnDebate">Start Debate</button>
+          <button class="btn btn-primary btn-sm" id="btnWhipVote">Whip Vote</button>
+        </div>
+        <div id="whipResult" class="mt-md"></div>
+      </div>
+    </div>
+
+    <!-- Bill Tracker Sidebar -->
+    <div class="parliament-sidebar">
+      <div class="bill-tracker">
+        <h3>Active Bills</h3>
+      </div>
+      <div class="bill-list" id="billList">
+        <div class="text-muted text-center p-md">No active bills.</div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--parchment-dark)">
+        <h3 style="margin-bottom:8px">Bill History</h3>
+      </div>
+      <div class="bill-list" id="billHistoryList" style="max-height:200px">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== SCREEN: Campaign =============== -->
+<div class="screen" id="screenCampaign">
+  <div class="game-header">
+    <button class="btn btn-ghost btn-sm" id="btnBackDashboardCamp" style="color:var(--gold)">← Dashboard</button>
+    <div class="header-info"><h3>Campaign Headquarters</h3></div>
+  </div>
+
+  <!-- Resource Bar -->
+  <div class="resource-panel">
+    <div class="resource-item">
+      <span class="resource-value" id="campFunds">0</span>
+      <span class="resource-label">Funds</span>
+    </div>
+    <div class="resource-item">
+      <span class="resource-value" id="campActivists">0</span>
+      <span class="resource-label">Activists</span>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary btn-sm" id="btnRunElection">Hold Election</button>
+  </div>
+
+  <div class="campaign-body">
+    <div class="campaign-main">
+      <!-- Region Grid -->
+      <div class="region-grid" id="regionGrid"></div>
+    </div>
+
+    <div class="campaign-sidebar">
+      <h3 style="margin-bottom:12px;color:var(--bg-dark)">Campaign Actions</h3>
+      <div class="campaign-actions">
+        <button class="campaign-action-btn" id="btnCampRally">
+          <h4>Hold Rally</h4>
+          <p>Boost support in targeted region. Costs 30 funds, 15 activists.</p>
+        </button>
+        <button class="campaign-action-btn" id="btnCampDoorknock">
+          <h4>Doorknock</h4>
+          <p>Reliable canvassing effort. Costs 10 funds, 30 activists.</p>
+        </button>
+        <button class="campaign-action-btn" id="btnCampAd">
+          <h4>Run Ad Campaign</h4>
+          <p>Expensive but impactful. Costs 80 funds, 5 activists.</p>
+        </button>
+      </div>
+
+      <h3 style="margin:20px 0 12px;color:var(--bg-dark)">Policy Positions</h3>
+      <div class="policy-sliders" id="policySliders"></div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== SCREEN: Election Night =============== -->
+<div class="screen" id="screenElection">
+  <div class="game-header">
+    <div class="header-info"><h3 style="color:var(--gold)">Election Night Special</h3></div>
+  </div>
+
+  <div style="display:flex;flex:1;overflow:hidden">
+    <div style="flex:1;overflow-y:auto;padding:20px" id="electionResults">
+      <div class="text-center p-md">
+        <h2>Waiting for results...</h2>
+      </div>
+    </div>
+    <div style="width:280px;background:var(--bg-darker);color:var(--text-light);overflow-y:auto;padding:12px">
+      <h3 style="color:var(--gold);margin-bottom:12px">Results Ticker</h3>
+      <div id="electionRunningTotal" class="mb-md" style="line-height:1.8"></div>
+      <div id="electionTicker"></div>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" id="btnElectionContinue">Continue to Parliament</button>
+    <button class="btn btn-ghost" id="btnBackDashboardElection" style="color:var(--gold)">← Dashboard</button>
+  </div>
+</div>
+
+<!-- =============== MODALS =============== -->
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>Settings</h2>
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="settingsAiEnabled" checked>
+        Enable AI (Ollama)
+      </label>
+    </div>
+    <div class="form-group">
+      <label for="settingsEndpoint">Ollama Endpoint</label>
+      <input type="text" id="settingsEndpoint" value="http://localhost:11434" placeholder="http://localhost:11434">
+    </div>
+    <div class="form-group">
+      <label for="settingsModel">Model</label>
+      <div class="flex gap-sm">
+        <select id="settingsModel" style="flex:1">
+          <option value="">Select a model...</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" id="btnRefreshModels">Refresh</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelSettings">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveSettings">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bill Proposal Modal -->
+<div class="modal-overlay" id="billModal">
+  <div class="modal">
+    <h2>Propose Legislation</h2>
+    <div class="form-group">
+      <label for="billTopicInput">Bill Topic</label>
+      <input type="text" id="billTopicInput" placeholder="e.g., NHS funding reform, housing supply, immigration controls..." maxlength="100">
+      <small class="text-muted">Describe what your bill should address. AI will draft the details.</small>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelBill">Cancel</button>
+      <button class="btn btn-primary" id="btnSubmitBill">Draft Bill</button>
+    </div>
+  </div>
+</div>
+
+<!-- PMQ Modal -->
+<div class="modal-overlay" id="pmqModal">
+  <div class="modal">
+    <h2>Prime Minister's Questions</h2>
+    <p class="text-muted mb-md">Choose your strategy for today's PMQs. The Opposition Leader will challenge you on recent events.</p>
+    <input type="hidden" id="pmqStrategyInput" value="">
+    <div class="strategy-options" id="pmqStrategies"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelPMQ">Cancel</button>
+      <button class="btn btn-primary" id="btnStartPMQ">Begin PMQs</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Scripts (dependency order) -->
+<script src="js/config.js"></script>
+<script src="js/constituencies.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/events.js"></script>
+<script src="js/campaign.js"></script>
+<script src="js/parliament.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
