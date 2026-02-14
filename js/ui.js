@@ -652,13 +652,21 @@ const UI = (() => {
     if (!gs) return;
 
     gs.ollamaEndpoint = $('settingsEndpoint').value.trim().replace(/\/+$/, '') || CONFIG.OLLAMA_ENDPOINT;
-    gs.ollamaModel = $('settingsModel').value;
+    const newModel = $('settingsModel').value;
+    const modelChanged = newModel !== gs.ollamaModel;
+    gs.ollamaModel = newModel;
     gs.aiEnabled = $('settingsAiEnabled').checked;
 
     saveGame();
     closeSettings();
     updateAiBadge();
-    showToast('Settings saved!', 'success');
+
+    if (modelChanged && newModel) {
+      const modelName = newModel.length > 24 ? newModel.slice(0, 22) + '...' : newModel;
+      showToast(`Switched to ${modelName}`, 'success');
+    } else {
+      showToast('Settings saved!', 'success');
+    }
   }
 
   async function refreshModels(selectEl, endpointEl) {
@@ -838,14 +846,16 @@ const UI = (() => {
 
     $('btnSubmitBill').disabled = true;
     $('btnSubmitBill').textContent = 'Drafting...';
+    closeBillModal();
+    showAiLoading('Drafting legislation...');
 
     const bill = await Parliament.proposeBill(topic);
 
+    hideAiLoading();
     $('btnSubmitBill').disabled = false;
     $('btnSubmitBill').textContent = 'Draft Bill';
 
     if (bill) {
-      closeBillModal();
       showToast(`${bill.title} introduced!`, 'success');
       renderParliament();
       renderDashboard();
@@ -909,6 +919,124 @@ const UI = (() => {
     if (viewEl) viewEl.classList.remove('hidden');
   }
 
+  // ---- Save/Load Modal ----
+
+  let saveLoadMode = 'save'; // 'save' or 'load'
+
+  function openSaveLoadModal(mode) {
+    saveLoadMode = mode;
+    const title = $(saveLoadMode === 'save' ? 'saveLoadTitle' : 'saveLoadTitle');
+    if (title) title.textContent = mode === 'save' ? 'Save Game' : 'Load Game';
+    renderSaveSlots();
+    $('saveLoadModal').classList.add('open');
+  }
+
+  function closeSaveLoadModal() {
+    $('saveLoadModal').classList.remove('open');
+  }
+
+  function renderSaveSlots() {
+    const container = $('saveSlots');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const slots = getSaveSlots();
+    slots.forEach(slot => {
+      const card = document.createElement('div');
+      card.className = 'save-slot-card' + (slot.empty ? ' empty' : '') +
+        (gameState && gameState.saveSlot === slot.slot ? ' active-slot' : '');
+
+      if (slot.empty) {
+        card.innerHTML = `
+          <div class="save-slot-badge empty-badge">+</div>
+          <div class="save-slot-info">
+            <div class="slot-name">Empty Slot ${slot.slot}</div>
+            <div class="slot-meta">${saveLoadMode === 'save' ? 'Click to save here' : 'No save data'}</div>
+          </div>
+        `;
+        if (saveLoadMode === 'save') {
+          card.onclick = () => {
+            saveGameToSlot(slot.slot);
+            closeSaveLoadModal();
+            showToast(`Game saved to slot ${slot.slot}!`, 'success');
+          };
+        }
+      } else {
+        const party = PARTIES[slot.party];
+        const partyColor = party ? party.color : '#999';
+        const partyShort = party ? party.short.slice(0, 3) : '?';
+
+        card.innerHTML = `
+          <div class="save-slot-badge" style="background:${partyColor}">${escapeHtml(partyShort)}</div>
+          <div class="save-slot-info">
+            <div class="slot-name">${escapeHtml(slot.name)}</div>
+            <div class="slot-meta">${escapeHtml(slot.date)} &mdash; Turn ${slot.turn}</div>
+          </div>
+          <div class="save-slot-actions">
+            <button class="btn-delete-slot" title="Delete this save" data-slot="${slot.slot}">&times;</button>
+          </div>
+        `;
+
+        // Click the card to save/load
+        card.onclick = (e) => {
+          if (e.target.closest('.btn-delete-slot')) return;
+          if (saveLoadMode === 'save') {
+            if (confirm(`Overwrite slot ${slot.slot} (${slot.name})?`)) {
+              saveGameToSlot(slot.slot);
+              closeSaveLoadModal();
+              showToast(`Game saved to slot ${slot.slot}!`, 'success');
+            }
+          } else {
+            loadGameFromSlot(slot.slot);
+            closeSaveLoadModal();
+            // Re-enter game with loaded state
+            if (gameState) {
+              showScreen('dashboard');
+              renderDashboard();
+              updateAiBadge();
+              if (gameState.currentEvent) renderEventCard(gameState.currentEvent);
+              // Re-render news feed from log
+              const feed = $('newsFeed');
+              if (feed) feed.innerHTML = '';
+              const recent = (gameState.newsLog || []).slice(-10).reverse();
+              if (recent.length > 0) renderNewsFeed(recent);
+              showToast(`Loaded: ${gameState.playerName}`, 'success');
+            }
+          }
+        };
+
+        // Delete button
+        const delBtn = card.querySelector('.btn-delete-slot');
+        if (delBtn) {
+          delBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete slot ${slot.slot} (${slot.name})? This cannot be undone.`)) {
+              deleteSlot(slot.slot);
+              renderSaveSlots();
+              showToast(`Slot ${slot.slot} deleted.`);
+            }
+          };
+        }
+      }
+
+      container.appendChild(card);
+    });
+  }
+
+  // ---- AI Loading Overlay ----
+
+  function showAiLoading(message) {
+    const overlay = $('aiLoadingOverlay');
+    const msg = $('aiLoadingMessage');
+    if (overlay) overlay.classList.remove('hidden');
+    if (msg) msg.textContent = message || 'Generating...';
+  }
+
+  function hideAiLoading() {
+    const overlay = $('aiLoadingOverlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+
   // ---- Helpers ----
 
   function getPartyColor(id) {
@@ -958,6 +1086,10 @@ const UI = (() => {
     closePMQModal,
     startPMQ,
     showParliamentTab,
+    openSaveLoadModal,
+    closeSaveLoadModal,
+    showAiLoading,
+    hideAiLoading,
     getPartyColor,
     getPartyName,
     getPartyShort,

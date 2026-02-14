@@ -45,6 +45,8 @@ function getYear(turn) {
 
 // ---- Game State ----
 
+const SAVE_SLOTS = 3;
+
 let gameState = null;
 
 function createGameState(playerParty, playerName) {
@@ -57,6 +59,7 @@ function createGameState(playerParty, playerName) {
     turn: 0,
     turnsInParliament: 0,
     electionCount: 0,
+    saveSlot: 1, // active save slot (1-3)
 
     // Seats from last election
     seats: { ...BASELINE_SEATS },
@@ -105,21 +108,53 @@ function createGameState(playerParty, playerName) {
   };
 }
 
-function saveGame() {
+// ---- Multi-Slot Save System ----
+
+function slotKey(slot) {
+  return `parliament_save_${slot}`;
+}
+
+function getSaveSlots() {
+  const slots = [];
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    try {
+      const raw = localStorage.getItem(slotKey(i));
+      if (raw) {
+        const state = JSON.parse(raw);
+        slots.push({
+          slot: i,
+          name: state.playerName || 'Unknown',
+          party: state.playerParty || 'lab',
+          date: formatDate(state.turn || 0),
+          turn: state.turn || 0,
+        });
+      } else {
+        slots.push({ slot: i, empty: true });
+      }
+    } catch {
+      slots.push({ slot: i, empty: true });
+    }
+  }
+  return slots;
+}
+
+function saveGameToSlot(slot) {
   if (!gameState) return;
   try {
-    localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(gameState));
+    gameState.saveSlot = slot;
+    localStorage.setItem(slotKey(slot), JSON.stringify(gameState));
   } catch (e) {
     console.warn('Save failed:', e);
   }
 }
 
-function loadGame() {
+function loadGameFromSlot(slot) {
   try {
-    const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
+    const raw = localStorage.getItem(slotKey(slot));
     if (!raw) return null;
     const state = JSON.parse(raw);
     if (state && state.version) {
+      state.saveSlot = slot;
       gameState = state;
       return state;
     }
@@ -129,13 +164,68 @@ function loadGame() {
   return null;
 }
 
+function deleteSlot(slot) {
+  localStorage.removeItem(slotKey(slot));
+  if (gameState && gameState.saveSlot === slot) {
+    gameState = null;
+  }
+}
+
+function hasSaveSlots() {
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    if (localStorage.getItem(slotKey(i))) return true;
+  }
+  return false;
+}
+
+// Auto-save to the currently active slot
+function saveGame() {
+  if (!gameState) return;
+  const slot = gameState.saveSlot || 1;
+  saveGameToSlot(slot);
+}
+
+// Compat shim: migrate old single-key save to slot 1
+function loadGame() {
+  // Check for legacy save and migrate
+  try {
+    const legacy = localStorage.getItem(CONFIG.STORAGE_KEY);
+    if (legacy) {
+      const state = JSON.parse(legacy);
+      if (state && state.version) {
+        state.saveSlot = 1;
+        gameState = state;
+        localStorage.setItem(slotKey(1), legacy);
+        localStorage.removeItem(CONFIG.STORAGE_KEY);
+        // Re-save with saveSlot field
+        saveGameToSlot(1);
+        return state;
+      }
+    }
+  } catch (e) {
+    console.warn('Legacy migration failed:', e);
+  }
+
+  // Try loading from any occupied slot (prefer slot 1)
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    const state = loadGameFromSlot(i);
+    if (state) return state;
+  }
+  return null;
+}
+
 function deleteSave() {
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    localStorage.removeItem(slotKey(i));
+  }
   localStorage.removeItem(CONFIG.STORAGE_KEY);
   gameState = null;
 }
 
 function hasSave() {
-  return !!localStorage.getItem(CONFIG.STORAGE_KEY);
+  // Check legacy key or any slot
+  if (localStorage.getItem(CONFIG.STORAGE_KEY)) return true;
+  return hasSaveSlots();
 }
 
 // ---- Toast ----

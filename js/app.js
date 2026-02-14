@@ -39,7 +39,12 @@
       UI.initSetupAiConfig();
     });
     on('btnContinue', 'click', () => {
-      if (gameState) {
+      // If multiple slots occupied, open load modal; otherwise load directly
+      const slots = getSaveSlots();
+      const occupied = slots.filter(s => !s.empty);
+      if (occupied.length > 1) {
+        UI.openSaveLoadModal('load');
+      } else if (gameState) {
         enterGame();
       }
     });
@@ -80,12 +85,19 @@
     // AI badge in header — opens settings
     on('aiBadge', 'click', () => UI.openSettings());
 
+    // Save/Load modal
+    on('btnSaveGame', 'click', () => UI.openSaveLoadModal('save'));
+    on('btnLoadGame', 'click', () => UI.openSaveLoadModal('load'));
+    on('btnCloseSaveLoad', 'click', () => UI.closeSaveLoadModal());
+
     // Settings modal
     on('btnSaveSettings', 'click', () => UI.saveSettings());
     on('btnCancelSettings', 'click', () => UI.closeSettings());
     on('btnRefreshModels', 'click', async () => {
+      UI.showAiLoading('Loading models...');
       await UI.updateSettingsConnectionStatus();
       await UI.refreshModels();
+      UI.hideAiLoading();
     });
     on('btnTestConnection', 'click', () => UI.updateSettingsConnectionStatus());
 
@@ -168,6 +180,14 @@
       if (e.key === 'Escape') {
         $$('.modal-overlay.open').forEach(m => m.classList.remove('open'));
       }
+      // Ctrl+S to quick-save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (gameState) {
+          saveGame();
+          showToast(`Saved to slot ${gameState.saveSlot || 1}`, 'success');
+        }
+      }
     });
   }
 
@@ -204,6 +224,11 @@
     }
 
     gameState = createGameState(partyId, playerName);
+
+    // Assign first available save slot
+    const slots = getSaveSlots();
+    const emptySlot = slots.find(s => s.empty);
+    gameState.saveSlot = emptySlot ? emptySlot.slot : 1;
 
     // If player picked the incumbent party (Labour 2024), they're PM
     if (partyId === 'lab') {
@@ -255,6 +280,11 @@
       btn.textContent = 'Processing...';
     }
 
+    // Model guard: warn if AI enabled but no model selected
+    if (gameState.aiEnabled && !gameState.ollamaModel) {
+      showToast('No AI model selected — open Settings to choose one', 'danger');
+    }
+
     // Check if election is due
     if (Engine.isElectionDue()) {
       showToast('Parliament has been dissolved. Election called!', 'danger');
@@ -269,6 +299,9 @@
       return;
     }
 
+    // Show AI loading overlay
+    UI.showAiLoading('Generating events...');
+
     // Advance turn
     const result = Engine.advanceTurn();
 
@@ -281,12 +314,16 @@
     }
 
     // Generate headlines
+    UI.showAiLoading('Generating headlines...');
     const headlines = await Events.generateTurnHeadlines();
     if (headlines) {
       gameState.newsLog.push(...headlines.map(h => ({ ...h, turn: gameState.turn })));
       saveGame();
       UI.renderNewsFeed(headlines);
     }
+
+    // Hide AI loading overlay
+    UI.hideAiLoading();
 
     // Update display
     UI.renderDashboard();

@@ -157,7 +157,7 @@
       <small><span id="headerDate">July 2024</span> &mdash; <span id="headerPhase">In Government</span></small>
     </div>
     <div class="header-actions">
-      <button class="ai-status-badge" id="aiBadge" title="AI Status — click to configure">
+      <button class="ai-status-badge" id="aiBadge" title="Click to change AI model">
         <span class="ai-status-dot" id="aiBadgeDot"></span>
         <span id="aiBadgeLabel">No AI</span>
       </button>
@@ -230,6 +230,14 @@
     </div>
   </div>
 
+  <!-- AI Loading Overlay -->
+  <div id="aiLoadingOverlay" class="ai-loading-overlay hidden">
+    <div class="ai-loading-content">
+      <div class="ai-loading-spinner"></div>
+      <div class="ai-loading-message" id="aiLoadingMessage">Generating events...</div>
+    </div>
+  </div>
+
   <!-- Action Bar -->
   <div class="action-bar">
     <button class="btn btn-secondary btn-sm" id="btnProposeBill" title="Introduce new legislation to Parliament">Propose Bill</button>
@@ -237,6 +245,8 @@
     <button class="btn btn-secondary btn-sm" id="btnCampaignView" title="Manage campaign resources and targeting">Campaign</button>
     <button class="btn btn-secondary btn-sm" id="btnCallElection" title="Call a General Election">Call Election</button>
     <button class="btn btn-secondary btn-sm" id="btnPMQs" title="Face Prime Minister's Questions">PMQs</button>
+    <button class="btn btn-ghost btn-sm" id="btnSaveGame" title="Save game (Ctrl+S)">Save</button>
+    <button class="btn btn-ghost btn-sm" id="btnLoadGame" title="Load a saved game">Load</button>
     <button class="btn btn-advance btn-sm" id="btnAdvanceMonth" title="Progress to the next month">Advance Month</button>
   </div>
 </div>
@@ -510,6 +520,17 @@
       <li>Check the <strong>News Feed</strong> on the right for headlines</li>
     </ul>
     <button class="btn btn-primary btn-sm" id="btnDismissWelcome">Start Governing</button>
+  </div>
+</div>
+
+<!-- Save/Load Modal -->
+<div class="modal-overlay" id="saveLoadModal">
+  <div class="modal" style="max-width:520px">
+    <h2 id="saveLoadTitle">Save Game</h2>
+    <div class="save-slots" id="saveSlots"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCloseSaveLoad">Cancel</button>
+    </div>
   </div>
 </div>
 
