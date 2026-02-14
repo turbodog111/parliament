@@ -636,10 +636,11 @@ const UI = (() => {
     $('settingsEndpoint').value = gs?.ollamaEndpoint || CONFIG.OLLAMA_ENDPOINT;
     $('settingsAiEnabled').checked = gs?.aiEnabled !== false;
 
-    // Refresh models
-    await refreshModels();
-
     $('settingsModal').classList.add('open');
+
+    // Auto-fetch models and test connection on open
+    await updateSettingsConnectionStatus();
+    await refreshModels();
   }
 
   function closeSettings() {
@@ -656,15 +657,17 @@ const UI = (() => {
 
     saveGame();
     closeSettings();
+    updateAiBadge();
     showToast('Settings saved!', 'success');
   }
 
-  async function refreshModels() {
-    const select = $('settingsModel');
+  async function refreshModels(selectEl, endpointEl) {
+    const select = selectEl || $('settingsModel');
+    const endpointInput = endpointEl || $('settingsEndpoint');
     if (!select) return;
     select.innerHTML = '<option value="">Loading...</option>';
 
-    const endpoint = $('settingsEndpoint').value.trim().replace(/\/+$/, '') || CONFIG.OLLAMA_ENDPOINT;
+    const endpoint = (endpointInput?.value || '').trim().replace(/\/+$/, '') || CONFIG.OLLAMA_ENDPOINT;
 
     // Temporarily override for fetch
     const origEndpoint = gameState?.ollamaEndpoint;
@@ -677,7 +680,7 @@ const UI = (() => {
     select.innerHTML = '';
     if (models.length === 0) {
       select.innerHTML = '<option value="">No models found — is Ollama running?</option>';
-      return;
+      return models;
     }
 
     models.forEach(m => {
@@ -692,6 +695,126 @@ const UI = (() => {
     if (current && models.some(m => m.id === current)) {
       select.value = current;
     }
+
+    return models;
+  }
+
+  async function testConnection(endpointValue) {
+    const endpoint = (endpointValue || '').trim().replace(/\/+$/, '') || CONFIG.OLLAMA_ENDPOINT;
+    try {
+      const res = await fetch(`${endpoint}/v1/models`, { signal: AbortSignal.timeout(5000) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function updateSettingsConnectionStatus() {
+    const dot = $('settingsAiDot');
+    const text = $('settingsAiStatusText');
+    if (!dot || !text) return;
+
+    text.textContent = 'Checking...';
+    dot.className = 'ai-status-dot';
+
+    const endpoint = $('settingsEndpoint')?.value;
+    const connected = await testConnection(endpoint);
+
+    if (connected) {
+      dot.className = 'ai-status-dot connected';
+      text.textContent = 'Connected to Ollama';
+      text.style.color = 'var(--success)';
+    } else {
+      dot.className = 'ai-status-dot disconnected';
+      text.textContent = 'Not connected — is Ollama running?';
+      text.style.color = 'var(--danger)';
+    }
+  }
+
+  // ---- AI Status Badge (Header) ----
+
+  async function updateAiBadge() {
+    const dot = $('aiBadgeDot');
+    const label = $('aiBadgeLabel');
+    if (!dot || !label) return;
+
+    const gs = gameState;
+    if (!gs || gs.aiEnabled === false) {
+      dot.className = 'ai-status-dot no-ai';
+      label.textContent = 'No AI';
+      return;
+    }
+
+    const connected = await testConnection(gs.ollamaEndpoint);
+    if (connected && gs.ollamaModel) {
+      dot.className = 'ai-status-dot connected';
+      // Show shortened model name
+      const modelName = gs.ollamaModel.length > 16 ? gs.ollamaModel.slice(0, 14) + '...' : gs.ollamaModel;
+      label.textContent = modelName;
+    } else if (connected) {
+      dot.className = 'ai-status-dot no-ai';
+      label.textContent = 'No model';
+    } else {
+      dot.className = 'ai-status-dot no-ai';
+      label.textContent = 'No AI';
+    }
+  }
+
+  // ---- Setup Screen AI Config ----
+
+  async function initSetupAiConfig() {
+    const dot = $('setupAiDot');
+    const text = $('setupAiStatusText');
+    const select = $('setupModel');
+    const endpointInput = $('setupEndpoint');
+    if (!dot || !text) return;
+
+    text.textContent = 'Checking connection...';
+    dot.className = 'ai-status-dot';
+
+    const endpoint = endpointInput?.value;
+    const connected = await testConnection(endpoint);
+
+    if (connected) {
+      dot.className = 'ai-status-dot connected';
+      text.textContent = 'Connected to Ollama';
+      text.style.color = 'var(--success)';
+      // Auto-load models
+      await refreshModels(select, endpointInput);
+    } else {
+      dot.className = 'ai-status-dot disconnected';
+      text.textContent = 'Ollama not found — AI features will be disabled';
+      text.style.color = 'var(--text-muted)';
+    }
+  }
+
+  async function refreshSetupModels() {
+    const select = $('setupModel');
+    const endpointInput = $('setupEndpoint');
+    const dot = $('setupAiDot');
+    const text = $('setupAiStatusText');
+
+    const models = await refreshModels(select, endpointInput);
+
+    if (models && models.length > 0) {
+      if (dot) dot.className = 'ai-status-dot connected';
+      if (text) { text.textContent = 'Connected to Ollama'; text.style.color = 'var(--success)'; }
+    } else {
+      if (dot) dot.className = 'ai-status-dot disconnected';
+      if (text) { text.textContent = 'Ollama not found — AI features will be disabled'; text.style.color = 'var(--text-muted)'; }
+    }
+  }
+
+  // ---- Welcome Guide ----
+
+  function showWelcomeGuide() {
+    const guide = $('welcomeGuide');
+    if (guide) guide.classList.remove('hidden');
+  }
+
+  function dismissWelcomeGuide() {
+    const guide = $('welcomeGuide');
+    if (guide) guide.classList.add('hidden');
   }
 
   // ---- Bill Proposal Modal ----
@@ -821,6 +944,13 @@ const UI = (() => {
     closeSettings,
     saveSettings,
     refreshModels,
+    testConnection,
+    updateSettingsConnectionStatus,
+    updateAiBadge,
+    initSetupAiConfig,
+    refreshSetupModels,
+    showWelcomeGuide,
+    dismissWelcomeGuide,
     openBillModal,
     closeBillModal,
     submitBill,

@@ -91,6 +91,7 @@
     <div class="title-buttons">
       <button class="btn btn-primary btn-lg btn-block" id="btnNewGame">New Game</button>
       <button class="btn btn-secondary btn-lg btn-block hidden" id="btnContinue">Continue</button>
+      <button class="btn btn-ghost btn-lg btn-block" id="btnHowToPlay" style="color:var(--text-mid);border-color:var(--gold-dim)">How to Play</button>
     </div>
     <div class="text-xs text-muted" style="margin-top:32px;opacity:0.6">
       Campaign. Govern. Lead. &mdash; AI-enriched by Ollama
@@ -113,7 +114,31 @@
           <label for="playerNameInput">Your Name (Party Leader)</label>
           <input type="text" id="playerNameInput" placeholder="Enter your name..." maxlength="40">
         </div>
-        <div class="flex gap-sm">
+
+        <!-- AI Configuration -->
+        <div class="setup-ai-config">
+          <h3 style="margin-bottom:12px;color:var(--bg-dark)">AI Configuration</h3>
+          <div class="form-group">
+            <label for="setupEndpoint">Ollama Endpoint</label>
+            <input type="text" id="setupEndpoint" value="http://localhost:11434" placeholder="http://localhost:11434">
+          </div>
+          <div class="form-group">
+            <label for="setupModel">Model</label>
+            <div class="flex gap-sm items-center">
+              <select id="setupModel" style="flex:1">
+                <option value="">Select a model...</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" id="btnSetupRefreshModels">Refresh</button>
+            </div>
+          </div>
+          <div class="setup-ai-status" id="setupAiStatus">
+            <span class="ai-status-dot" id="setupAiDot"></span>
+            <span id="setupAiStatusText">Checking connection...</span>
+          </div>
+          <small class="text-muted" style="display:block;margin-top:8px">AI is optional — the game works without it using pre-written events.</small>
+        </div>
+
+        <div class="flex gap-sm" style="margin-top:20px">
           <button class="btn btn-ghost flex-1" id="btnBackToTitle">Back</button>
           <button class="btn btn-primary flex-1" id="btnStartGame">Start Game</button>
         </div>
@@ -132,6 +157,10 @@
       <small><span id="headerDate">July 2024</span> &mdash; <span id="headerPhase">In Government</span></small>
     </div>
     <div class="header-actions">
+      <button class="ai-status-badge" id="aiBadge" title="AI Status — click to configure">
+        <span class="ai-status-dot" id="aiBadgeDot"></span>
+        <span id="aiBadgeLabel">No AI</span>
+      </button>
       <button id="btnSettings" title="Settings">Settings</button>
     </div>
   </div>
@@ -203,12 +232,12 @@
 
   <!-- Action Bar -->
   <div class="action-bar">
-    <button class="btn btn-secondary btn-sm" id="btnProposeBill">Propose Bill</button>
-    <button class="btn btn-secondary btn-sm" id="btnParliament">Parliament</button>
-    <button class="btn btn-secondary btn-sm" id="btnCampaignView">Campaign</button>
-    <button class="btn btn-secondary btn-sm" id="btnCallElection">Call Election</button>
-    <button class="btn btn-secondary btn-sm" id="btnPMQs">PMQs</button>
-    <button class="btn btn-advance btn-sm" id="btnAdvanceMonth">Advance Month</button>
+    <button class="btn btn-secondary btn-sm" id="btnProposeBill" title="Introduce new legislation to Parliament">Propose Bill</button>
+    <button class="btn btn-secondary btn-sm" id="btnParliament" title="View debates, bills, and voting">Parliament</button>
+    <button class="btn btn-secondary btn-sm" id="btnCampaignView" title="Manage campaign resources and targeting">Campaign</button>
+    <button class="btn btn-secondary btn-sm" id="btnCallElection" title="Call a General Election">Call Election</button>
+    <button class="btn btn-secondary btn-sm" id="btnPMQs" title="Face Prime Minister's Questions">PMQs</button>
+    <button class="btn btn-advance btn-sm" id="btnAdvanceMonth" title="Progress to the next month">Advance Month</button>
   </div>
 </div>
 
@@ -364,7 +393,14 @@
     </div>
     <div class="form-group">
       <label for="settingsEndpoint">Ollama Endpoint</label>
-      <input type="text" id="settingsEndpoint" value="http://localhost:11434" placeholder="http://localhost:11434">
+      <div class="flex gap-sm items-center">
+        <input type="text" id="settingsEndpoint" value="http://localhost:11434" placeholder="http://localhost:11434" style="flex:1">
+        <button class="btn btn-ghost btn-sm" id="btnTestConnection">Test</button>
+      </div>
+    </div>
+    <div class="settings-connection-status" id="settingsConnectionStatus">
+      <span class="ai-status-dot" id="settingsAiDot"></span>
+      <span id="settingsAiStatusText">Checking...</span>
     </div>
     <div class="form-group">
       <label for="settingsModel">Model</label>
@@ -409,6 +445,71 @@
       <button class="btn btn-ghost" id="btnCancelPMQ">Cancel</button>
       <button class="btn btn-primary" id="btnStartPMQ">Begin PMQs</button>
     </div>
+  </div>
+</div>
+
+<!-- How to Play Modal -->
+<div class="modal-overlay" id="howToPlayModal">
+  <div class="modal" style="max-width:640px">
+    <h2>How to Play</h2>
+
+    <div class="htp-section">
+      <h3>The Game Loop</h3>
+      <ul>
+        <li><strong>Advance Month</strong> to progress time — events and headlines appear each turn</li>
+        <li><strong>Respond to events</strong> by choosing from options that affect your approval and party unity</li>
+        <li><strong>Propose bills</strong> and guide them through Parliament with debates and votes</li>
+        <li><strong>Face PMQs</strong> if you're PM — choose a strategy and survive the dispatch box</li>
+        <li><strong>Call an election</strong> when the time is right (or wait for one to be called)</li>
+      </ul>
+    </div>
+
+    <div class="htp-section">
+      <h3>Key Stats</h3>
+      <ul>
+        <li><strong>Approval</strong> — Your personal approval rating. Events and decisions push it up or down</li>
+        <li><strong>Unity</strong> — How united your party is behind you. Low unity means rebellions</li>
+        <li><strong>Polling</strong> — National vote intention. Determines election outcomes</li>
+        <li><strong>Seats</strong> — How many MPs your party holds in the House of Commons (326 = majority)</li>
+      </ul>
+    </div>
+
+    <div class="htp-section">
+      <h3>AI Setup (Optional)</h3>
+      <ul>
+        <li>AI events, debates, and headlines are powered by <strong>Ollama</strong> running locally</li>
+        <li>Install Ollama, pull a model (e.g. <code>ollama pull llama3</code>), and it auto-connects</li>
+        <li>Without AI, the game uses pre-written events — still fully playable</li>
+      </ul>
+    </div>
+
+    <div class="htp-section">
+      <h3>Tips</h3>
+      <ul>
+        <li>Start by advancing a few months to see how events and news work</li>
+        <li>Propose bills to push your agenda through Parliament</li>
+        <li>Watch your approval before calling an election — timing is everything</li>
+        <li>Campaign actions target specific regions to swing seats your way</li>
+      </ul>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="btnCloseHowToPlay">Got it!</button>
+    </div>
+  </div>
+</div>
+
+<!-- Welcome Guide Overlay -->
+<div class="welcome-guide hidden" id="welcomeGuide">
+  <div class="welcome-guide-content">
+    <h3>Welcome to Parliament!</h3>
+    <ul>
+      <li>Click <strong>Advance Month</strong> to begin your first month in office</li>
+      <li>Events will appear for you to respond to</li>
+      <li>Open <strong>Parliament</strong> to propose bills and debate</li>
+      <li>Check the <strong>News Feed</strong> on the right for headlines</li>
+    </ul>
+    <button class="btn btn-primary btn-sm" id="btnDismissWelcome">Start Governing</button>
   </div>
 </div>
 

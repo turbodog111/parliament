@@ -392,6 +392,161 @@ a:hover { color: var(--gold); }
 .p-md { padding: 16px; }
 .hidden { display: none !important; }
 
+/* === HOW TO PLAY MODAL === */
+.htp-section {
+  margin-bottom: 16px;
+}
+.htp-section h3 {
+  font-size: 1rem;
+  color: var(--bg-dark);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--parchment-dark);
+}
+.htp-section ul {
+  list-style: none;
+  padding: 0;
+}
+.htp-section li {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 3px 0 3px 16px;
+  position: relative;
+  color: var(--text-dark);
+}
+.htp-section li::before {
+  content: '\2022';
+  color: var(--gold);
+  font-weight: 700;
+  position: absolute;
+  left: 0;
+}
+.htp-section code {
+  background: var(--parchment-dark);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
+/* === WELCOME GUIDE OVERLAY === */
+.welcome-guide {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.welcome-guide.hidden {
+  display: none !important;
+}
+.welcome-guide-content {
+  background: var(--parchment);
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  padding: 28px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+  text-align: left;
+}
+.welcome-guide-content h3 {
+  color: var(--bg-dark);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gold);
+}
+.welcome-guide-content ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 16px;
+}
+.welcome-guide-content li {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  padding: 4px 0 4px 16px;
+  position: relative;
+}
+.welcome-guide-content li::before {
+  content: '\25B8';
+  color: var(--gold);
+  position: absolute;
+  left: 0;
+}
+.welcome-guide-content .btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+/* === AI STATUS BADGE (Header) === */
+.ai-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--gold-dim);
+  color: var(--text-mid);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: 'Georgia', serif;
+  transition: all var(--transition);
+}
+.ai-status-badge:hover {
+  background: var(--gold);
+  color: var(--bg-darkest);
+}
+
+/* === AI STATUS DOT === */
+.ai-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.ai-status-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 4px var(--success);
+}
+.ai-status-dot.disconnected {
+  background: var(--danger);
+}
+.ai-status-dot.no-ai {
+  background: var(--warning);
+}
+
+/* === SETUP AI CONFIG === */
+.setup-ai-config {
+  margin-top: 20px;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--parchment-dark);
+  border-radius: var(--radius);
+}
+.setup-ai-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 6px 0;
+}
+
+/* === SETTINGS CONNECTION STATUS === */
+.settings-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 4px 0 12px;
+}
+
 /* === RESPONSIVE === */
 @media (max-width: 900px) {
   .game-layout { flex-direction: column; }

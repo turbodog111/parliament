@@ -36,11 +36,20 @@
     on('btnNewGame', 'click', () => {
       UI.renderSetup();
       UI.showScreen('setup');
+      UI.initSetupAiConfig();
     });
     on('btnContinue', 'click', () => {
       if (gameState) {
         enterGame();
       }
+    });
+
+    // How to Play modal
+    on('btnHowToPlay', 'click', () => {
+      $('howToPlayModal').classList.add('open');
+    });
+    on('btnCloseHowToPlay', 'click', () => {
+      $('howToPlayModal').classList.remove('open');
     });
 
     // Setup screen
@@ -62,10 +71,23 @@
     on('btnPMQs', 'click', () => UI.openPMQModal());
     on('btnSettings', 'click', () => UI.openSettings());
 
+    // Setup AI config
+    on('btnSetupRefreshModels', 'click', () => UI.refreshSetupModels());
+
+    // Welcome guide
+    on('btnDismissWelcome', 'click', () => UI.dismissWelcomeGuide());
+
+    // AI badge in header — opens settings
+    on('aiBadge', 'click', () => UI.openSettings());
+
     // Settings modal
     on('btnSaveSettings', 'click', () => UI.saveSettings());
     on('btnCancelSettings', 'click', () => UI.closeSettings());
-    on('btnRefreshModels', 'click', () => UI.refreshModels());
+    on('btnRefreshModels', 'click', async () => {
+      await UI.updateSettingsConnectionStatus();
+      await UI.refreshModels();
+    });
+    on('btnTestConnection', 'click', () => UI.updateSettingsConnectionStatus());
 
     // Bill modal
     on('btnSubmitBill', 'click', () => UI.submitBill());
@@ -194,6 +216,14 @@
       gameState.oppositionLeader = partyId;
     }
 
+    // Apply AI config from setup screen
+    const setupEndpoint = $('setupEndpoint')?.value?.trim().replace(/\/+$/, '');
+    const setupModel = $('setupModel')?.value;
+    if (setupEndpoint) gameState.ollamaEndpoint = setupEndpoint;
+    if (setupModel) gameState.ollamaModel = setupModel;
+    // If no model or endpoint, AI will be auto-disabled gracefully
+    gameState.aiEnabled = !!(setupModel);
+
     saveGame();
     enterGame();
   }
@@ -201,13 +231,21 @@
   function enterGame() {
     UI.showScreen('dashboard');
     UI.renderDashboard();
+    UI.updateAiBadge();
 
     // Check if there's a pending event
     if (gameState.currentEvent) {
       UI.renderEventCard(gameState.currentEvent);
     }
 
-    showToast(`Welcome, ${gameState.playerName}!`, 'success');
+    // Show welcome guide on first turn
+    if (gameState.turn === 0 && !gameState._welcomeShown) {
+      gameState._welcomeShown = true;
+      saveGame();
+      UI.showWelcomeGuide();
+    } else {
+      showToast(`Welcome back, ${gameState.playerName}!`, 'success');
+    }
   }
 
   async function advanceMonth() {
